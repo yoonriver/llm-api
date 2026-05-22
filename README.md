@@ -368,3 +368,75 @@ Application Load Balancer
   ↓
 GET /health
 ```
+
+## Day 3 - AWS 계정 없이 배포 준비
+
+### 목표
+
+AWS 계정을 사용할 수 없는 날이므로, 실제 리소스를 생성하지 않고 토요일/일요일/월요일 실습을 위한 명령어와 설정값을 정리했다.
+
+### 오늘 한 일
+
+- Docker image `llm-api:local` 확인
+- 로컬 Docker container에서 `/health`, `/chat` 확인
+- ECR push 명령어 정리
+- ECS 콘솔 설정값 정리
+- ALB health check 설정값 정리
+- task execution role과 task role 차이 정리
+- Bedrock 연동 준비 문서 작성
+- Bedrock task role policy 초안 작성
+
+### AWS 배포 목표 흐름
+
+```text
+llm-api:local
+  ↓
+Amazon ECR
+  ↓
+Amazon ECS Fargate
+  ↓
+Application Load Balancer
+  ↓
+GET /health
+```
+
+### Bedrock 연동 목표 흐름
+
+```text
+FastAPI /chat
+  ↓
+Boto3 bedrock-runtime
+  ↓
+Bedrock Claude
+  ↓
+응답 반환
+```
+
+### 핵심 개념
+
+```text
+Task execution role:
+  ECS가 ECR image pull, CloudWatch Logs 전송에 사용하는 role
+
+Task role:
+  컨테이너 안의 FastAPI 코드가 Bedrock 같은 AWS 서비스를 호출할 때 사용하는 role
+```
+
+암기 문장:
+
+```text
+execution role은 ECS가 쓰는 권한,
+task role은 내 코드가 쓰는 권한.
+```
+
+### 다음 AWS 사용 가능일에 할 일
+
+```text
+[ ] aws sts get-caller-identity
+[ ] ECR repository 생성
+[ ] Docker image push
+[ ] ECS Task Definition 생성
+[ ] ECS Service 생성
+[ ] ALB 연결
+[ ] /health 외부 호출 성공
+```
