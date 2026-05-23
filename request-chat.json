@@ -1,4 +1,4 @@
 {
-  "message": "Docker에서 실행 중이야?",
+  "message": "ECS에서 실행 중이야?",
   "system_prompt": "짧게 답해줘"
 }

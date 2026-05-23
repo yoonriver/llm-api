@@ -440,3 +440,170 @@ task role은 내 코드가 쓰는 권한.
 [ ] ALB 연결
 [ ] /health 외부 호출 성공
 ```
+
+## Day 4 - ECR 실습
+
+### 목표
+
+로컬 Docker image `llm-api:local`을 `us-east-1` region의 Amazon ECR에 push한다.
+
+### 진행 흐름
+
+```text
+llm-api:local
+  ↓ docker tag
+<account-id>.dkr.ecr.us-east-1.amazonaws.com/llm-api:latest
+  ↓ docker push
+Amazon ECR
+```
+
+### 사용한 명령어
+
+```powershell
+$REGION="us-east-1"
+$APP_NAME="llm-api"
+$ACCOUNT_ID = (aws sts get-caller-identity | ConvertFrom-Json).Account
+$REGISTRY = "${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
+$ECR_URI = "${REGISTRY}/${APP_NAME}"
+
+aws ecr create-repository `
+  --repository-name $APP_NAME `
+  --region $REGION
+
+aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $REGISTRY
+
+docker tag llm-api:local "${ECR_URI}:latest"
+
+docker push "${ECR_URI}:latest"
+
+aws ecr describe-images `
+  --repository-name $APP_NAME `
+  --region $REGION
+```
+
+### 결과
+
+```text
+AWS 인증:
+  성공
+
+Region:
+  us-east-1
+
+ECR repository 생성:
+  성공 / 이미 존재
+
+ECR login:
+  성공
+
+Docker tag:
+  성공
+
+Docker push:
+  성공
+
+ECR image 확인:
+  latest tag 확인
+```
+
+### 오늘 배운 것
+
+```text
+ECR은 region별 image 저장소다.
+이번 실습 계정은 us-east-1 기준이므로 ECR repository도 us-east-1에 만들었다.
+ECS에서 사용할 image URI는 <account-id>.dkr.ecr.us-east-1.amazonaws.com/llm-api:latest 형태다.
+```
+
+## Day 4 - ECS/Fargate/ALB 배포
+
+### 목표
+
+ECR에 push한 FastAPI Docker image를 ECS Fargate에서 실행하고, ALB를 통해 `/health`, `/chat`을 호출한다.
+
+### Region
+
+```text
+us-east-1
+```
+
+### 사용한 ECR image
+
+```text
+<account-id>.dkr.ecr.us-east-1.amazonaws.com/llm-api:latest
+```
+
+### 구성
+
+```text
+ECR:
+  llm-api
+
+ECS Cluster:
+  llm-api-cluster
+
+Task Definition:
+  llm-api-task
+
+ECS Service:
+  llm-api-service
+
+ALB:
+  llm-api-alb
+
+Target Group:
+  llm-api-tg
+
+Container Port:
+  8000
+
+Health Check Path:
+  /health
+```
+
+### 흐름
+
+```text
+Client
+  ↓ HTTP 80
+Application Load Balancer
+  ↓ HTTP 8000
+ECS Fargate Task
+  ↓
+FastAPI /health, /chat
+```
+
+### 결과
+
+```text
+ECR push:
+  성공 / 실패
+
+ECS task running:
+  성공 / 실패
+
+CloudWatch Logs:
+  확인함 / 확인 못함
+
+Target group healthy:
+  성공 / 실패
+
+ALB /health:
+  성공 / 실패
+
+ALB /chat mock:
+  성공 / 실패
+```
+
+### 오늘 배운 것
+
+```text
+ECR은 Docker image 저장소다.
+ECS는 container 실행 관리자다.
+Task Definition은 container 실행 설계도다.
+ECS Service는 task를 계속 running 상태로 유지한다.
+Fargate는 EC2 서버를 직접 관리하지 않고 container를 실행하는 방식이다.
+ALB는 외부 HTTP 요청을 ECS task로 전달하는 입구다.
+Target Group은 ALB가 요청을 보낼 대상 목록이다.
+Health Check는 target이 살아 있는지 확인하는 검사다.
+Fargate task의 target group target type은 ip로 설정해야 한다.
+```
