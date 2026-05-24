@@ -607,3 +607,311 @@ Target Group은 ALB가 요청을 보낼 대상 목록이다.
 Health Check는 target이 살아 있는지 확인하는 검사다.
 Fargate task의 target group target type은 ip로 설정해야 한다.
 ```
+
+## Day 5 - Bedrock Claude 연동 완료
+
+### 목표
+
+FastAPI `/chat` API가 mock 응답이 아니라 AWS Bedrock Claude 응답을 반환하도록 만든다.
+
+### 최종 흐름
+
+```text
+Client
+  ↓ HTTP 80
+Application Load Balancer
+  ↓ HTTP 8000
+ECS Fargate Task
+  ↓
+FastAPI /chat
+  ↓
+AWS Bedrock Claude
+  ↓
+응답 반환
+```
+
+### Region
+
+```text
+us-east-1
+```
+
+### ECS 환경변수
+
+```text
+AWS_REGION=us-east-1
+BEDROCK_MODEL_ID=실제_MODEL_ID
+USE_BEDROCK=true
+```
+
+### IAM 정리
+
+```text
+Task execution role:
+  ECS가 ECR image pull, CloudWatch Logs 전송에 사용
+
+Task role:
+  FastAPI 코드가 Bedrock 호출에 사용
+```
+
+### 해결한 문제
+
+```text
+문제:
+  Bedrock Converse 호출 시 AccessDeniedException 발생
+
+원인:
+  llm-api-bedrock-task-role에 Bedrock invoke 권한이 부족했음
+
+해결:
+  task role에 bedrock:InvokeModel 권한 추가 후 ECS Service force new deployment 수행
+```
+
+### 결과
+
+```text
+Bedrock 단독 호출:
+  성공
+
+로컬 FastAPI /chat → Bedrock:
+  성공
+
+ECR bedrock image push:
+  성공
+
+ECS 새 revision 배포:
+  성공
+
+ALB /chat → Bedrock:
+  성공
+```
+
+### 오늘 배운 것
+
+```text
+Bedrock Runtime은 실제 모델 호출에 사용된다.
+Converse API는 메시지 기반 대화형 요청을 보낼 때 사용한다.
+FastAPI 코드가 Bedrock을 호출하려면 ECS task role에 bedrock:InvokeModel 권한이 필요하다.
+Task execution role과 task role은 다르다.
+USE_BEDROCK=true일 때 BedrockClaudeService를 사용한다.
+```
+
+## Day 5.5 - S3 / DynamoDB 실습
+
+### 목표
+
+FastAPI 앱에서 AWS S3와 DynamoDB를 직접 호출해본다.
+
+이번 실습의 목표는 아래와 같다.
+
+```text
+1. S3 bucket 생성
+2. DynamoDB table 생성
+3. Python script로 S3 / DynamoDB 단독 호출
+4. FastAPI endpoint로 S3 / DynamoDB 기능 추가
+5. ECS task role에 S3 / DynamoDB 권한 추가
+6. ALB를 통해 S3 / DynamoDB API 호출
+```
+
+---
+
+### 최종 구조
+
+```text
+Client
+  ↓ HTTP 80
+Application Load Balancer
+  ↓ HTTP 8000
+ECS Fargate Task
+  ↓
+FastAPI
+  ├─ S3
+  │   └─ 텍스트/object 저장
+  │
+  └─ DynamoDB
+      └─ 채팅 이력 메타데이터 저장
+```
+
+---
+
+### S3 역할
+
+S3는 파일/object 저장소로 사용했다.
+
+이번 실습에서는 긴 텍스트나 artifact를 저장하는 용도로 사용했다.
+
+```text
+S3 Bucket:
+  llm-api-artifacts-<ACCOUNT_ID>
+
+S3 Object 예시:
+  notes/day5/s3-fastapi-test.txt
+```
+
+구현한 API:
+
+```text
+POST /storage/s3/text
+GET  /storage/s3/text/{object_key}
+```
+
+---
+
+### DynamoDB 역할
+
+DynamoDB는 채팅 이력 메타데이터 저장소로 사용했다.
+
+이번 실습에서는 session 단위로 채팅 이력을 저장하고 조회하는 용도로 사용했다.
+
+```text
+Table:
+  llm-chat-history
+
+Partition key:
+  session_id
+
+Sort key:
+  created_at
+```
+
+구현한 API:
+
+```text
+POST /history
+GET  /history/{session_id}
+```
+
+---
+
+### S3와 DynamoDB 차이
+
+```text
+S3:
+  파일, 긴 텍스트, PDF, 이미지, HTML, parser artifact 저장에 적합하다.
+
+DynamoDB:
+  session_id, created_at, message, answer 같은 구조화된 이력/메타데이터 저장에 적합하다.
+```
+
+이번 실습에서는 이렇게 나누었다.
+
+```text
+S3:
+  텍스트 object 저장
+
+DynamoDB:
+  채팅 이력 저장
+```
+
+---
+
+### AWS 리소스
+
+```text
+Region:
+  us-east-1
+
+S3 Bucket:
+  llm-api-artifacts-<ACCOUNT_ID>
+
+DynamoDB Table:
+  llm-chat-history
+
+ECS Cluster:
+  llm-api-cluster
+
+ECS Service:
+  llm-api-service
+
+Task Role:
+  llm-api-bedrock-task-role
+```
+
+---
+
+### ECS 환경변수
+
+ECS Task Definition에 아래 환경변수를 추가했다.
+
+```text
+AWS_REGION=us-east-1
+S3_BUCKET=llm-api-artifacts-<ACCOUNT_ID>
+DDB_TABLE=llm-chat-history
+```
+
+기존 Bedrock 환경변수도 유지했다.
+
+```text
+BEDROCK_MODEL_ID=<실제_MODEL_ID>
+USE_BEDROCK=true
+```
+
+---
+
+### IAM 권한
+
+S3와 DynamoDB 호출 권한은 `task execution role`이 아니라 `task role`에 추가했다.
+
+```text
+Task execution role:
+  ECS가 ECR image pull, CloudWatch Logs 전송에 사용
+
+Task role:
+  FastAPI 코드가 Bedrock, S3, DynamoDB를 호출할 때 사용
+```
+
+S3 / DynamoDB 권한은 아래 task role에 추가했다.
+
+```text
+llm-api-bedrock-task-role
+```
+
+---
+
+### 최종 테스트 결과
+
+```text
+S3 bucket 생성:
+  성공 / 실패
+
+S3 put/get CLI 테스트:
+  성공 / 실패
+
+DynamoDB table 생성:
+  성공 / 실패
+
+DynamoDB put/query CLI 테스트:
+  성공 / 실패
+
+scripts/test_s3.py:
+  성공 / 실패
+
+scripts/test_dynamodb.py:
+  성공 / 실패
+
+로컬 FastAPI S3 endpoint:
+  성공 / 실패
+
+로컬 FastAPI DynamoDB endpoint:
+  성공 / 실패
+
+ECS/ALB S3 endpoint:
+  성공 / 실패
+
+ECS/ALB DynamoDB endpoint:
+  성공 / 실패
+```
+
+---
+
+### 오늘 배운 것
+
+```text
+S3는 파일/object 저장소다.
+DynamoDB는 NoSQL key-value/document 데이터베이스다.
+S3 object는 bucket + key로 식별한다.
+DynamoDB item은 primary key로 식별한다.
+이번 DynamoDB table은 session_id를 partition key, created_at을 sort key로 사용했다.
+ECS에서 S3/DynamoDB를 호출하려면 task role에 권한을 추가해야 한다.
+task execution role과 task role은 다르다.
+```

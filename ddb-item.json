@@ -1,0 +1,6 @@
+{
+  "session_id": {"S": "session-cli-test"},
+  "created_at": {"S": "2026-05-24T00:00:00Z"},
+  "message": {"S": "CLI 테스트"},
+  "answer": {"S": "DynamoDB 저장 성공"}
+}

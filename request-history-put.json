@@ -1,0 +1,5 @@
+{
+  "session_id": "session-fastapi-test",
+  "message": "S3와 DynamoDB 차이가 뭐야?",
+  "answer": "S3는 파일 저장소이고 DynamoDB는 NoSQL 데이터베이스입니다."
+}

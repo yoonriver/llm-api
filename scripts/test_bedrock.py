@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-region = os.getenv("AWS_REGION", "ap-northeast-2")
+region = os.getenv("AWS_REGION", "us-east-1")
 model_id = os.getenv("BEDROCK_MODEL_ID")
 
 if not model_id:

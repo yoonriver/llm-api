@@ -14,7 +14,13 @@ async def chat(request: ChatRequest) -> ChatResponse:
         system_prompt=request.system_prompt,
     )
 
+    model_name = (
+        settings.bedrock_model_id
+        if settings.use_bedrock and settings.bedrock_model_id
+        else settings.mock_model_name
+    )
+
     return ChatResponse(
         answer=answer,
-        model=settings.mock_model_name,
+        model=model_name,
     )

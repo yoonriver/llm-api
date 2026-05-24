@@ -1,4 +1,4 @@
 {
-  "message": "ECS에서 실행 중이야?",
-  "system_prompt": "짧게 답해줘"
+  "message": "FastAPI와 AWS Bedrock을 한 문장으로 설명해줘.",
+  "system_prompt": "너는 친절한 백엔드 멘토야. 짧게 답해줘."
 }
