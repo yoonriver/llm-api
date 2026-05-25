@@ -44,7 +44,7 @@ Invoke-RestMethod `
 ```powershell
 pytest
 ```
----------------------------------------------------------------------------------
+
 
 ## Day 2 - Docker
 
@@ -914,4 +914,89 @@ DynamoDB item은 primary key로 식별한다.
 이번 DynamoDB table은 session_id를 partition key, created_at을 sort key로 사용했다.
 ECS에서 S3/DynamoDB를 호출하려면 task role에 권한을 추가해야 한다.
 task execution role과 task role은 다르다.
+```
+
+
+## Day 6 - LangChain 기본
+
+### 목표
+
+AWS 계정 없이 LangChain의 기본 구조를 익히고, FastAPI에 `/chain/chat` API를 추가한다.
+
+### 오늘 만든 흐름
+
+```text
+Client
+  ↓
+FastAPI /chain/chat
+  ↓
+ChatPromptTemplate
+  ↓
+FakeListChatModel
+  ↓
+StrOutputParser
+  ↓
+Response
+```
+
+### 사용한 주요 구성 요소
+
+```text
+ChatPromptTemplate:
+  system message와 human message를 template으로 관리한다.
+
+FakeListChatModel:
+  실제 LLM 대신 정해진 응답을 반환하는 테스트용 chat model이다.
+
+StrOutputParser:
+  모델 응답을 문자열로 변환한다.
+```
+
+### API
+
+```text
+POST /chain/chat
+```
+
+요청 예시:
+
+```json
+{
+  "message": "LangChain이 뭐야?",
+  "tone": "초보자도 이해하기 쉽게"
+}
+```
+
+응답 예시:
+
+```json
+{
+  "answer": "LangChain mock 응답입니다. 실제 LLM 대신 테스트용 FakeListChatModel이 반환한 답변입니다.",
+  "chain_type": "langchain-fake-chat"
+}
+```
+
+### 테스트
+
+```powershell
+curl.exe -X POST http://127.0.0.1:8000/chain/chat -H "Content-Type: application/json" --data-binary "@request-chain-chat.json"
+```
+
+### 기존 Bedrock 직접 호출 방식과 비교
+
+```text
+기존 방식:
+  FastAPI → boto3 bedrock-runtime → client.converse()
+
+LangChain 방식:
+  FastAPI → PromptTemplate → ChatModel → OutputParser
+```
+
+### 오늘 배운 것
+
+```text
+LangChain은 LLM 앱을 prompt, model, parser 단위로 나눠 구성할 수 있게 해준다.
+단순 Bedrock 호출은 boto3 직접 호출로도 충분하다.
+하지만 프롬프트, parser, tool, retriever, agent가 늘어나면 LangChain 구조가 유리해진다.
+FakeListChatModel을 사용하면 실제 LLM 없이도 chain 구조를 테스트할 수 있다.
 ```
