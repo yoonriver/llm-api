@@ -1000,3 +1000,103 @@ LangChain은 LLM 앱을 prompt, model, parser 단위로 나눠 구성할 수 있
 하지만 프롬프트, parser, tool, retriever, agent가 늘어나면 LangChain 구조가 유리해진다.
 FakeListChatModel을 사용하면 실제 LLM 없이도 chain 구조를 테스트할 수 있다.
 ```
+
+## Day 7 - LangGraph 기본 구현
+
+### 목표
+
+LangGraph의 기본 개념인 State, Node, Edge를 사용해 FastAPI에 `/agent/chat` API를 추가한다.
+
+### 오늘 만든 흐름
+
+```text
+START
+  ↓
+classify_question
+  ↓
+generate_answer
+  ↓
+validate_answer
+  ↓
+END
+```
+
+### API
+
+```text
+POST /agent/chat
+```
+
+요청 예시:
+
+```json
+{
+  "message": "LangGraph는 LangChain이랑 뭐가 달라?"
+}
+```
+
+응답 예시:
+
+```json
+{
+  "question_type": "llm_framework",
+  "answer": "LangChain/LangGraph 관련 질문으로 분류했습니다...",
+  "validated": true,
+  "trace": [
+    "classify_question:llm_framework",
+    "generate_answer",
+    "validate_answer:True"
+  ]
+}
+```
+
+### State
+
+State는 그래프 전체를 흐르는 공유 데이터다.
+
+```python
+class AgentState(TypedDict):
+    message: str
+    question_type: str
+    answer: str
+    validated: bool
+    trace: list[str]
+```
+
+### Node
+
+Node는 실제 작업을 수행하는 함수다.
+
+이번 실습에서는 세 개의 node를 만들었다.
+
+```text
+classify_question:
+  질문 유형 분류
+
+generate_answer:
+  질문 유형에 따른 답변 생성
+
+validate_answer:
+  답변 검증
+```
+
+### Edge
+
+Edge는 노드 간 실행 순서를 정한다.
+
+```python
+graph.add_edge(START, "classify_question")
+graph.add_edge("classify_question", "generate_answer")
+graph.add_edge("generate_answer", "validate_answer")
+graph.add_edge("validate_answer", END)
+```
+
+### 오늘 배운 것
+
+```text
+LangGraph는 LLM 애플리케이션의 작업 흐름을 State, Node, Edge로 표현하는 workflow 도구다.
+State는 들고 다니는 데이터다.
+Node는 작업 함수다.
+Edge는 다음 작업으로 가는 연결선이다.
+LangChain은 LLM 호출 부품 조립에 가깝고, LangGraph는 LLM 작업 흐름 관리에 가깝다.
+```
